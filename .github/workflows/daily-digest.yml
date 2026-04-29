@@ -1,0 +1,70 @@
+name: Daily AI digest
+
+on:
+  schedule:
+    # 06:00 UTC = 08:00 Europe/Belgrade (with DST awareness, this drifts ±1h
+    # twice a year — fine for a morning digest)
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Build the digest but don't actually send the email"
+        required: false
+        default: "false"
+
+permissions:
+  contents: write   # needed to commit updated seen-items.json back to the repo
+
+concurrency:
+  group: daily-digest
+  cancel-in-progress: false
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: Build & send digest
+        env:
+          ANTHROPIC_API_KEY:    ${{ secrets.ANTHROPIC_API_KEY }}
+          HOSTINGER_USER:       ${{ secrets.HOSTINGER_USER }}
+          HOSTINGER_PASS:       ${{ secrets.HOSTINGER_PASS }}
+          HOSTINGER_SMTP_HOST:  ${{ vars.HOSTINGER_SMTP_HOST || 'smtp.hostinger.com' }}
+          HOSTINGER_SMTP_PORT:  ${{ vars.HOSTINGER_SMTP_PORT || '465' }}
+          DIGEST_TO:            ${{ vars.DIGEST_TO }}
+          FEEDBACK_TO:          ${{ vars.FEEDBACK_TO }}
+          DIGEST_FROM_NAME:     ${{ vars.DIGEST_FROM_NAME || 'AI News Feed' }}
+          MAX_ITEMS:            ${{ vars.MAX_ITEMS || '6' }}
+          DIGEST_DRY_RUN:       ${{ inputs.dry_run || 'false' }}
+        run: python -m src.main digest
+
+      - name: Commit updated state
+        if: ${{ inputs.dry_run != 'true' }}
+        run: |
+          git config user.name  "ai-news-feed-bot"
+          git config user.email "ai-news-feed-bot@users.noreply.github.com"
+          git add data/seen-items.json
+          if git diff --cached --quiet; then
+            echo "no state changes to commit"
+          else
+            git commit -m "chore: update seen-items after daily digest"
+            git push
+          fi
+
+      - name: Upload dry-run artifacts
+        if: ${{ inputs.dry_run == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: digest-dry-run
+          path: out/
+          retention-days: 7

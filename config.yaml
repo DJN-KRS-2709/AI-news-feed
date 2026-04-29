@@ -1,0 +1,94 @@
+# AI News Feed — source configuration
+# Edit freely; the digest will use whatever's enabled here.
+
+# How far back to look for items each run
+lookback_hours: 36
+
+# Subreddits — fetched via free Reddit JSON API (no auth)
+# Top of "day" view, filtered by score + comment count
+reddit:
+  enabled: true
+  subreddits:
+    - ClaudeAI
+    - cursor
+    - LocalLLaMA
+    - ChatGPTCoding
+    - OpenAI
+    - LangChain
+    - LLMDevs
+    - ProductManagement
+    - SaaS
+    - startups
+  min_score: 25
+  limit_per_sub: 12
+
+# Hacker News — Algolia front-page API, filtered by AI/PM keywords
+hackernews:
+  enabled: true
+  min_points: 60
+  keywords:
+    - "AI"
+    - "LLM"
+    - "Claude"
+    - "GPT"
+    - "Anthropic"
+    - "OpenAI"
+    - "Cursor"
+    - "Copilot"
+    - "agent"
+    - "prompt"
+    - "RAG"
+    - "vibe coding"
+    - "prototype"
+    - "PM"
+    - "product management"
+
+# RSS feeds — Substack newsletters + company blogs
+rss:
+  enabled: true
+  feeds:
+    # Product & strategy thinking
+    - name: "Lenny's Newsletter"
+      url: "https://www.lennysnewsletter.com/feed"
+    - name: "Stratechery"
+      url: "https://stratechery.com/feed/"
+    - name: "Every"
+      url: "https://every.to/feed.xml"
+    - name: "One Useful Thing (Ethan Mollick)"
+      url: "https://www.oneusefulthing.org/feed"
+    - name: "Latent Space"
+      url: "https://www.latent.space/feed"
+    - name: "The Pragmatic Engineer"
+      url: "https://newsletter.pragmaticengineer.com/feed"
+
+    # AI lab & tooling blogs
+    # Anthropic doesn't publish a native RSS feed; openrss.org scrapes it.
+    - name: "Anthropic News"
+      url: "https://openrss.org/feed/www.anthropic.com/news"
+    - name: "OpenAI Blog"
+      url: "https://openai.com/blog/rss.xml"
+    - name: "Cursor Changelog"
+      url: "https://cursor.com/changelog/rss.xml"
+    - name: "Vercel Blog"
+      url: "https://vercel.com/atom"
+    - name: "Supabase Blog"
+      url: "https://supabase.com/feed.xml"
+    - name: "GitHub Blog"
+      url: "https://github.blog/feed/"
+    - name: "Hugging Face Blog"
+      url: "https://huggingface.co/blog/feed.xml"
+
+# arXiv — only highly-cited or recent featured papers; kept conservative
+arxiv:
+  enabled: true
+  categories:
+    - cs.AI
+    - cs.CL
+  max_per_run: 3
+  keywords:
+    - "agent"
+    - "tool use"
+    - "code generation"
+    - "alignment"
+    - "RLHF"
+    - "fine-tuning"

@@ -1,0 +1,50 @@
+name: Feedback sync
+
+on:
+  schedule:
+    # Every 6 hours — picks up your votes between digests so the next digest
+    # already reflects them.
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: feedback-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: Pull feedback from inbox
+        env:
+          HOSTINGER_USER:       ${{ secrets.HOSTINGER_USER }}
+          HOSTINGER_PASS:       ${{ secrets.HOSTINGER_PASS }}
+          HOSTINGER_IMAP_HOST:  ${{ vars.HOSTINGER_IMAP_HOST || 'imap.hostinger.com' }}
+          HOSTINGER_IMAP_PORT:  ${{ vars.HOSTINGER_IMAP_PORT || '993' }}
+        run: python -m src.main feedback-sync
+
+      - name: Commit feedback updates
+        run: |
+          git config user.name  "ai-news-feed-bot"
+          git config user.email "ai-news-feed-bot@users.noreply.github.com"
+          git add data/taste-feedback.jsonl
+          if git diff --cached --quiet; then
+            echo "no new feedback"
+          else
+            git commit -m "chore: ingest taste feedback"
+            git push
+          fi
