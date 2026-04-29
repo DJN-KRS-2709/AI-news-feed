@@ -29,6 +29,16 @@ jobs:
       - name: Install deps
         run: pip install -r requirements.txt
 
+      - name: Check secrets
+        env:
+          HOSTINGER_USER: ${{ secrets.HOSTINGER_USER }}
+          HOSTINGER_PASS: ${{ secrets.HOSTINGER_PASS }}
+        run: |
+          if [ -z "$HOSTINGER_USER" ] || [ -z "$HOSTINGER_PASS" ]; then
+            echo "::warning::HOSTINGER_USER/PASS not set yet — feedback sync will skip."
+            echo "Add them at: https://github.com/${{ github.repository }}/settings/secrets/actions"
+          fi
+
       - name: Pull feedback from inbox
         env:
           HOSTINGER_USER:       ${{ secrets.HOSTINGER_USER }}

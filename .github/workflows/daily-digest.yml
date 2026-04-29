@@ -34,6 +34,21 @@ jobs:
       - name: Install deps
         run: pip install -r requirements.txt
 
+      - name: Check secrets
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          HOSTINGER_USER:    ${{ secrets.HOSTINGER_USER }}
+          HOSTINGER_PASS:    ${{ secrets.HOSTINGER_PASS }}
+        run: |
+          missing=""
+          [ -z "$ANTHROPIC_API_KEY" ] && missing="$missing ANTHROPIC_API_KEY"
+          [ -z "$HOSTINGER_USER" ]    && missing="$missing HOSTINGER_USER"
+          [ -z "$HOSTINGER_PASS" ]    && missing="$missing HOSTINGER_PASS"
+          if [ -n "$missing" ]; then
+            echo "::warning::Missing secrets:$missing — digest will skip cleanly."
+            echo "Add them at: https://github.com/${{ github.repository }}/settings/secrets/actions"
+          fi
+
       - name: Build & send digest
         env:
           ANTHROPIC_API_KEY:    ${{ secrets.ANTHROPIC_API_KEY }}

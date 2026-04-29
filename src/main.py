@@ -41,10 +41,33 @@ def _load_config() -> dict:
         return yaml.safe_load(f)
 
 
+def _require_env(*keys: str) -> bool:
+    """Return True if all keys are present and non-empty. Otherwise log a
+    friendly skip message and return False — the caller should exit 0 so the
+    workflow stays green until the user wires up the secrets."""
+    missing = [k for k in keys if not os.environ.get(k, "").strip()]
+    if not missing:
+        return True
+    logging.warning(
+        "skipping: required env vars not configured yet: %s. "
+        "Add them as GitHub repo secrets and re-run.",
+        ", ".join(missing),
+    )
+    return False
+
+
 def cmd_digest(args: argparse.Namespace) -> int:
+    dry_run = args.dry_run or os.environ.get("DIGEST_DRY_RUN", "").lower() == "true"
+
+    # We need the LLM key always, and the SMTP creds whenever we're sending.
+    required = ["ANTHROPIC_API_KEY"]
+    if not dry_run:
+        required += ["HOSTINGER_USER", "HOSTINGER_PASS"]
+    if not _require_env(*required):
+        return 0
+
     config = _load_config()
     max_items = int(os.environ.get("MAX_ITEMS", "6"))
-    dry_run = args.dry_run or os.environ.get("DIGEST_DRY_RUN", "").lower() == "true"
 
     seen = load_seen()
     raw = fetch_all(config)
@@ -88,6 +111,8 @@ def cmd_digest(args: argparse.Namespace) -> int:
 
 
 def cmd_feedback_sync(args: argparse.Namespace) -> int:
+    if not _require_env("HOSTINGER_USER", "HOSTINGER_PASS"):
+        return 0
     n = sync_feedback()
     print(f"ingested {n} new feedback entries")
     return 0
