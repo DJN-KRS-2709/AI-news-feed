@@ -3,9 +3,10 @@
 Ranks the day's items against the taste profile and accumulated feedback,
 then returns the top N with a personalised "why this matters" line each.
 
-Uses Claude with structured JSON output. The model is told *what* the reader
-cares about, *what* they've upvoted/downvoted recently, and is asked to think
-about it before producing JSON.
+Provider-pluggable: defaults to OpenAI (gpt-4o-mini), but can use Anthropic
+Claude by setting LLM_PROVIDER=anthropic. The model is told *what* the
+reader cares about, *what* they've upvoted/downvoted recently, and is asked
+to produce strict JSON.
 """
 from __future__ import annotations
 
@@ -16,14 +17,13 @@ import re
 from collections import Counter
 from typing import Optional
 
-from anthropic import Anthropic
-
 from .models import Item, RankedItem
 from .state import load_feedback, load_taste_profile
 
 log = logging.getLogger(__name__)
 
-DEFAULT_MODEL = "claude-sonnet-4-5"
+DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
+DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-5"
 MAX_CANDIDATES = 60          # cap before sending to the model
 MAX_OUTPUT_TOKENS = 4000
 
@@ -147,15 +147,49 @@ def _parse_picks(raw: str) -> tuple[list[dict], str]:
     return data.get("picks", []), data.get("editor_note", "")
 
 
+def _call_openai(system_prompt: str, user_prompt: str, model: str) -> str:
+    from openai import OpenAI
+
+    client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+    resp = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        # JSON mode requires the system prompt to mention "JSON" — ours does.
+        response_format={"type": "json_object"},
+        max_tokens=MAX_OUTPUT_TOKENS,
+        temperature=0.4,
+    )
+    return resp.choices[0].message.content or ""
+
+
+def _call_anthropic(system_prompt: str, user_prompt: str, model: str) -> str:
+    from anthropic import Anthropic
+
+    client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+    resp = client.messages.create(
+        model=model,
+        max_tokens=MAX_OUTPUT_TOKENS,
+        system=system_prompt,
+        messages=[{"role": "user", "content": user_prompt}],
+    )
+    return "".join(b.text for b in resp.content
+                   if getattr(b, "type", "") == "text")
+
+
 def rank_items(items: list[Item], max_items: int = 6,
                model: Optional[str] = None) -> tuple[list[RankedItem], str]:
-    """Returns (ranked_picks, editor_note)."""
+    """Returns (ranked_picks, editor_note).
+
+    Provider is chosen by LLM_PROVIDER env (`openai` default, or `anthropic`).
+    Model can be overridden via OPENAI_MODEL / ANTHROPIC_MODEL.
+    """
     if not items:
         return [], "No fresh items in any feed today."
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        raise RuntimeError("ANTHROPIC_API_KEY not set")
+    provider = os.environ.get("LLM_PROVIDER", "openai").lower()
 
     # Cap candidate pool size — biggest signal is title + source, so prefer
     # items with explicit scores at the top.
@@ -165,24 +199,28 @@ def rank_items(items: list[Item], max_items: int = 6,
     pool = items_sorted[:MAX_CANDIDATES]
     by_id = {it.id: it for it in pool}
 
-    client = Anthropic(api_key=api_key)
-    model_name = model or os.environ.get("ANTHROPIC_MODEL", DEFAULT_MODEL)
-
     user_prompt = _build_user_prompt(
         pool, max_items,
         taste_profile=load_taste_profile(),
         feedback_summary=_summarize_feedback(load_feedback()),
     )
 
-    log.info("ranking %d candidates with %s", len(pool), model_name)
-    resp = client.messages.create(
-        model=model_name,
-        max_tokens=MAX_OUTPUT_TOKENS,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": user_prompt}],
-    )
-    raw = "".join(block.text for block in resp.content
-                  if getattr(block, "type", "") == "text")
+    if provider == "openai":
+        if not os.environ.get("OPENAI_API_KEY"):
+            raise RuntimeError("OPENAI_API_KEY not set")
+        model_name = model or os.environ.get("OPENAI_MODEL", DEFAULT_OPENAI_MODEL)
+        log.info("ranking %d candidates with openai/%s", len(pool), model_name)
+        raw = _call_openai(SYSTEM_PROMPT, user_prompt, model_name)
+    elif provider == "anthropic":
+        if not os.environ.get("ANTHROPIC_API_KEY"):
+            raise RuntimeError("ANTHROPIC_API_KEY not set")
+        model_name = model or os.environ.get("ANTHROPIC_MODEL", DEFAULT_ANTHROPIC_MODEL)
+        log.info("ranking %d candidates with anthropic/%s", len(pool), model_name)
+        raw = _call_anthropic(SYSTEM_PROMPT, user_prompt, model_name)
+    else:
+        raise RuntimeError(
+            f"unknown LLM_PROVIDER: {provider!r} (expected 'openai' or 'anthropic')"
+        )
 
     picks, editor_note = _parse_picks(raw)
 

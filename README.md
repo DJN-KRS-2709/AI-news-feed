@@ -38,54 +38,66 @@ human-editable. The feedback log lives in
 
 ---
 
-## Setup (one-time, ~15 minutes)
+## Setup (one-time, ~10 minutes)
 
-### 1. Create the GitHub repo and push this code
+### 1. Get an OpenAI API key
 
-The repo is already wired to `git@github.com:DJN-KRS-2709/AI-news-feed.git`.
-First push:
+Go to https://platform.openai.com/api-keys → **Create new secret key** →
+copy the `sk-...` value. You only need a few cents of credit per month.
 
-```bash
-git add -A
-git commit -m "feat: initial scaffold of AI news feed"
-git push -u origin main
-```
+(Prefer Claude? Set `LLM_PROVIDER=anthropic` as a GitHub Variable and add
+`ANTHROPIC_API_KEY` as a Secret instead — see Tuning section.)
 
-### 2. Add GitHub secrets (sensitive)
+### 2. Get a Gmail App Password
+
+Gmail won't accept your normal Google password over SMTP/IMAP — you need a
+16-character App Password.
+
+1. Make sure 2-Step Verification is on: https://myaccount.google.com/security
+2. Go to https://myaccount.google.com/apppasswords
+3. Name it `AI News Feed`, click **Create**, copy the 16-character password
+   (it looks like `abcd efgh ijkl mnop` — Google shows spaces, you can
+   include or strip them when pasting).
+4. Make sure IMAP is enabled in Gmail:
+   https://mail.google.com/mail/u/0/#settings/fwdandpop → **IMAP access:
+   Enable IMAP** → Save.
+
+### 3. Add GitHub secrets
 
 Repo → **Settings → Secrets and variables → Actions → New repository secret**:
 
-| Name                | Value                                                |
-| ------------------- | ---------------------------------------------------- |
-| `ANTHROPIC_API_KEY` | Your Claude API key (`sk-ant-...`)                   |
-| `HOSTINGER_USER`    | Mailbox address, e.g. `dejan@dejan-krstic.com`       |
-| `HOSTINGER_PASS`    | Mailbox password (the one you use in webmail)        |
+| Name              | Value                                              |
+| ----------------- | -------------------------------------------------- |
+| `OPENAI_API_KEY`  | The `sk-...` key from step 1                       |
+| `MAIL_USER`       | Your Gmail address (e.g. `dejan.krstic2709@gmail.com`) |
+| `MAIL_PASS`       | The 16-char App Password from step 2               |
 
-### 3. Add GitHub variables (non-sensitive)
+### 4. Add GitHub variables (non-sensitive)
 
-Same screen, **Variables** tab:
+Same screen, **Variables** tab — most have sensible defaults but
+`DIGEST_TO` and `FEEDBACK_TO` should be set:
 
-| Name                 | Suggested value           | Required?               |
-| -------------------- | ------------------------- | ----------------------- |
-| `DIGEST_TO`          | `dejan@dejan-krstic.com`  | yes                     |
-| `FEEDBACK_TO`        | `dejan@dejan-krstic.com`  | yes (where 👍/👎 go)    |
-| `DIGEST_FROM_NAME`   | `AI News Feed`            | optional                |
-| `MAX_ITEMS`          | `6`                       | optional (default 6)    |
-| `HOSTINGER_SMTP_HOST`| `smtp.hostinger.com`      | optional (default fine) |
-| `HOSTINGER_SMTP_PORT`| `465`                     | optional (default fine) |
-| `HOSTINGER_IMAP_HOST`| `imap.hostinger.com`      | optional (default fine) |
-| `HOSTINGER_IMAP_PORT`| `993`                     | optional (default fine) |
+| Name                 | Suggested value                  | Default                |
+| -------------------- | -------------------------------- | ---------------------- |
+| `DIGEST_TO`          | `dejan.krstic2709@gmail.com`     | (uses MAIL_USER)       |
+| `FEEDBACK_TO`        | `dejan.krstic2709@gmail.com`     | (uses MAIL_USER)       |
+| `DIGEST_FROM_NAME`   | `AI News Feed`                   | `AI News Feed`         |
+| `MAX_ITEMS`          | `6`                              | `6`                    |
+| `LLM_PROVIDER`       | `openai` or `anthropic`          | `openai`               |
+| `OPENAI_MODEL`       | `gpt-4o-mini` or `gpt-4o`        | `gpt-4o-mini`          |
+| `MAIL_SMTP_HOST`     | `smtp.gmail.com`                 | `smtp.gmail.com`       |
+| `MAIL_IMAP_HOST`     | `imap.gmail.com`                 | `imap.gmail.com`       |
 
-### 4. Trigger a dry run from the Actions tab
+### 5. Trigger a dry run from the Actions tab
 
 GitHub → **Actions → Daily AI digest → Run workflow** with `dry_run = true`.
 This builds the digest without sending. Look at the uploaded `digest-dry-run`
 artifact to inspect the HTML before going live.
 
-### 5. Schedule kicks in automatically
+### 6. Schedule kicks in automatically
 
-After a successful dry run, the daily cron will fire at **06:00 UTC**
-(08:00 Belgrade) and the feedback sync will run every 6 hours.
+After a successful dry run, the daily cron fires at **06:00 UTC**
+(08:00 Belgrade) and the feedback sync runs every 6 hours.
 
 ---
 
@@ -171,12 +183,15 @@ AI-news-feed/
 
 ## Cost estimate
 
-- **Claude Sonnet** ranking ≈ 60 candidate items + system prompt + JSON output
-  → roughly 6–10k tokens per day → **~$0.05–0.15/day** at current Sonnet pricing.
-- **Hostinger SMTP/IMAP** — included in your existing mail plan.
-- **GitHub Actions** — well within the free tier (~2 minutes/day).
+- **OpenAI gpt-4o-mini** ranking ≈ 60 candidates + prompt + JSON output
+  → roughly 6–10k tokens per day → **~$0.001–0.003/day** (~$1/year)
+- **OpenAI gpt-4o** if you want richer "why this matters" lines
+  → **~$0.02–0.05/day** (~$10/year)
+- **Anthropic claude-sonnet** ≈ **~$0.05–0.15/day** (~$30/year) — best taste matching
+- **Gmail SMTP/IMAP** — free
+- **GitHub Actions** — well within the free tier (~2 minutes/day)
 
-Total: pocket change, even running for a year.
+Total: pocket change at the gpt-4o-mini default.
 
 ---
 

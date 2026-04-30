@@ -60,9 +60,11 @@ def cmd_digest(args: argparse.Namespace) -> int:
     dry_run = args.dry_run or os.environ.get("DIGEST_DRY_RUN", "").lower() == "true"
 
     # We need the LLM key always, and the SMTP creds whenever we're sending.
-    required = ["ANTHROPIC_API_KEY"]
+    provider = os.environ.get("LLM_PROVIDER", "openai").lower()
+    llm_key = "ANTHROPIC_API_KEY" if provider == "anthropic" else "OPENAI_API_KEY"
+    required = [llm_key]
     if not dry_run:
-        required += ["HOSTINGER_USER", "HOSTINGER_PASS"]
+        required += ["MAIL_USER", "MAIL_PASS"]
     if not _require_env(*required):
         return 0
 
@@ -85,7 +87,7 @@ def cmd_digest(args: argparse.Namespace) -> int:
 
     feedback_to = os.environ.get("FEEDBACK_TO") \
         or os.environ.get("DIGEST_TO") \
-        or os.environ["HOSTINGER_USER"]
+        or os.environ.get("MAIL_USER", "")
     subject, html = render_html(picks, total_candidates=len(fresh),
                                 feedback_to=feedback_to, editor_note=editor_note)
     plaintext = render_plaintext(picks, feedback_to=feedback_to,
@@ -102,7 +104,7 @@ def cmd_digest(args: argparse.Namespace) -> int:
         print(plaintext)
         return 0
 
-    to_addr = os.environ.get("DIGEST_TO") or os.environ["HOSTINGER_USER"]
+    to_addr = os.environ.get("DIGEST_TO") or os.environ["MAIL_USER"]
     send_email(to_addr=to_addr, subject=subject, html=html, plaintext=plaintext)
 
     # Mark sent items as seen so they don't repeat.
@@ -111,7 +113,7 @@ def cmd_digest(args: argparse.Namespace) -> int:
 
 
 def cmd_feedback_sync(args: argparse.Namespace) -> int:
-    if not _require_env("HOSTINGER_USER", "HOSTINGER_PASS"):
+    if not _require_env("MAIL_USER", "MAIL_PASS"):
         return 0
     n = sync_feedback()
     print(f"ingested {n} new feedback entries")

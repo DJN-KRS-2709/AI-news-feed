@@ -31,20 +31,20 @@ jobs:
 
       - name: Check secrets
         env:
-          HOSTINGER_USER: ${{ secrets.HOSTINGER_USER }}
-          HOSTINGER_PASS: ${{ secrets.HOSTINGER_PASS }}
+          MAIL_USER: ${{ secrets.MAIL_USER }}
+          MAIL_PASS: ${{ secrets.MAIL_PASS }}
         run: |
-          if [ -z "$HOSTINGER_USER" ] || [ -z "$HOSTINGER_PASS" ]; then
-            echo "::warning::HOSTINGER_USER/PASS not set yet — feedback sync will skip."
+          if [ -z "$MAIL_USER" ] || [ -z "$MAIL_PASS" ]; then
+            echo "::warning::MAIL_USER/MAIL_PASS not set yet — feedback sync will skip."
             echo "Add them at: https://github.com/${{ github.repository }}/settings/secrets/actions"
           fi
 
       - name: Pull feedback from inbox
         env:
-          HOSTINGER_USER:       ${{ secrets.HOSTINGER_USER }}
-          HOSTINGER_PASS:       ${{ secrets.HOSTINGER_PASS }}
-          HOSTINGER_IMAP_HOST:  ${{ vars.HOSTINGER_IMAP_HOST || 'imap.hostinger.com' }}
-          HOSTINGER_IMAP_PORT:  ${{ vars.HOSTINGER_IMAP_PORT || '993' }}
+          MAIL_USER:      ${{ secrets.MAIL_USER }}
+          MAIL_PASS:      ${{ secrets.MAIL_PASS }}
+          MAIL_IMAP_HOST: ${{ vars.MAIL_IMAP_HOST || 'imap.gmail.com' }}
+          MAIL_IMAP_PORT: ${{ vars.MAIL_IMAP_PORT || '993' }}
         run: python -m src.main feedback-sync
 
       - name: Commit feedback updates

@@ -1,7 +1,8 @@
-"""SMTP send via Hostinger.
+"""SMTP send via any standard SMTP provider.
 
-Hostinger uses standard SMTP — we go SMTP_SSL on port 465 by default.
-Credentials come from env vars (see .env.example).
+Uses MAIL_USER / MAIL_PASS / MAIL_SMTP_HOST / MAIL_SMTP_PORT env vars.
+Defaults to Gmail (smtp.gmail.com:465). For Gmail you need a 16-char
+App Password (not your Google account password) — see README.
 """
 from __future__ import annotations
 
@@ -16,10 +17,10 @@ log = logging.getLogger(__name__)
 
 def send_email(to_addr: str, subject: str, html: str, plaintext: str,
                from_name: str | None = None) -> None:
-    user = os.environ["HOSTINGER_USER"]
-    password = os.environ["HOSTINGER_PASS"]
-    host = os.environ.get("HOSTINGER_SMTP_HOST", "smtp.hostinger.com")
-    port = int(os.environ.get("HOSTINGER_SMTP_PORT", "465"))
+    user = os.environ["MAIL_USER"]
+    password = os.environ["MAIL_PASS"]
+    host = os.environ.get("MAIL_SMTP_HOST", "smtp.gmail.com")
+    port = int(os.environ.get("MAIL_SMTP_PORT", "465"))
     sender_name = from_name or os.environ.get("DIGEST_FROM_NAME", "AI News Feed")
 
     msg = EmailMessage()

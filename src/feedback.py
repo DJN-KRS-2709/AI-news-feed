@@ -1,11 +1,17 @@
 """IMAP feedback ingest.
 
-Polls the Hostinger mailbox for unread messages whose subject starts with
+Polls the configured mailbox for unread messages whose subject starts with
 `[ainews-feedback]`, parses the structured subject + optional body note, and
 appends each as a JSON record to data/taste-feedback.jsonl.
 
-After processing, messages are marked read and moved to a "AI-Feedback-Processed"
-folder (created on the fly) so we never double-count them.
+Uses MAIL_USER / MAIL_PASS / MAIL_IMAP_HOST / MAIL_IMAP_PORT env vars.
+Defaults to Gmail (imap.gmail.com:993). For Gmail, IMAP must be enabled in
+Settings → Forwarding and POP/IMAP, and you need a 16-char App Password.
+
+After processing, messages are marked read and copied to an "AI-Feedback-Processed"
+label/folder so we never double-count them. They're also marked \\Deleted
+in INBOX which, on Gmail, removes the INBOX label (the message stays in
+All Mail under the new label).
 
 Subject format produced by render.py:
     [ainews-feedback] up | <item-id> | <truncated title>
@@ -100,10 +106,10 @@ def _ensure_folder(imap: imaplib.IMAP4_SSL, folder: str) -> None:
 
 def sync_feedback() -> int:
     """Returns the number of new feedback entries appended."""
-    user = os.environ["HOSTINGER_USER"]
-    password = os.environ["HOSTINGER_PASS"]
-    host = os.environ.get("HOSTINGER_IMAP_HOST", "imap.hostinger.com")
-    port = int(os.environ.get("HOSTINGER_IMAP_PORT", "993"))
+    user = os.environ["MAIL_USER"]
+    password = os.environ["MAIL_PASS"]
+    host = os.environ.get("MAIL_IMAP_HOST", "imap.gmail.com")
+    port = int(os.environ.get("MAIL_IMAP_PORT", "993"))
 
     log.info("connecting to IMAP %s:%d as %s", host, port, user)
     imap = imaplib.IMAP4_SSL(host, port)
